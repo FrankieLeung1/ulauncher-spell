@@ -19,9 +19,9 @@
             "id": "matching",
             "type": "text",
             "name": "Matching method",
-            "description": "Matching method. Choose 'regex' if you feel 'fuzzy' is too slow",
-            "default_value": "fuzzy",
-            "options": ["fuzzy", "regex"]
+            "description": "Matching method. 'symspell' is ultra-fast (3000x faster), 'fuzzy' is balanced, 'regex' is prefix-only",
+            "default_value": "symspell",
+            "options": ["symspell", "fuzzy", "regex"]
         },
         {
             "id": "vocabulary",

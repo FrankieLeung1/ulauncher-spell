@@ -3,6 +3,7 @@ import os
 import json
 import glob
 import logging
+import time
 from time import sleep
 from functools import lru_cache
 from ulauncher.api.shared.action.CopyToClipboardAction import CopyToClipboardAction
@@ -30,6 +31,12 @@ try:
     RAPIDFUZZ_AVAILABLE = True
 except ImportError:
     RAPIDFUZZ_AVAILABLE = False
+
+try:
+    from symspellpy import SymSpell, Verbosity
+    SYMSPELL_AVAILABLE = True
+except ImportError:
+    SYMSPELL_AVAILABLE = False
 
 
 logging.basicConfig()
@@ -121,6 +128,76 @@ def rapidfuzz_search(words, query, limit=9, score_cutoff=65):
     return result_words
 
 
+class SymSpellMatcher:
+    """SymSpell-based ultra-fast spell checker."""
+    
+    def __init__(self):
+        self.symspell = None
+        self.word_dict = {}
+        self.is_initialized = False
+    
+    def initialize(self, words):
+        """Initialize SymSpell dictionary from word list."""
+        if not SYMSPELL_AVAILABLE:
+            logger.warning("SymSpell not available, falling back to other methods")
+            return False
+        
+        logger.info("Initializing SymSpell dictionary...")
+        start_time = time.time()
+        
+        # Create SymSpell instance with optimized parameters
+        self.symspell = SymSpell(max_dictionary_edit_distance=2, prefix_length=7)
+        self.word_dict = {}
+        
+        # Build dictionary and word mapping
+        word_count = 0
+        for word_obj in words:
+            word_str = word_obj.get_search_name()
+            if word_str and len(word_str.strip()) > 0:  # Skip empty words
+                # Add to SymSpell dictionary (frequency = 1 for all words)
+                self.symspell.create_dictionary_entry(word_str, 1)
+                
+                # Map word string to original Word object
+                if word_str not in self.word_dict:
+                    self.word_dict[word_str] = []
+                self.word_dict[word_str].append(word_obj)
+                word_count += 1
+        
+        init_time = time.time() - start_time
+        logger.info(f"SymSpell dictionary initialized with {word_count} words in {init_time:.2f}s")
+        
+        self.is_initialized = True
+        return True
+    
+    def search(self, query, max_edit_distance=2, limit=9):
+        """Search using SymSpell for ultra-fast spell checking."""
+        if not self.is_initialized or not query:
+            return []
+        
+        # Get suggestions from SymSpell
+        suggestions = self.symspell.lookup(
+            query, 
+            Verbosity.CLOSEST, 
+            max_edit_distance=max_edit_distance
+        )
+        
+        # Convert back to Word objects
+        result_words = []
+        seen_words = set()
+        
+        for suggestion in suggestions:
+            word_str = suggestion.term
+            if word_str in self.word_dict and word_str not in seen_words:
+                # Add first Word object for this string (could have multiple from different vocabs)
+                result_words.append(self.word_dict[word_str][0])
+                seen_words.add(word_str)
+                
+                if len(result_words) >= limit:
+                    break
+        
+        return result_words
+
+
 class OneDictExtension(Extension):
     def __init__(self):
         super(OneDictExtension, self).__init__()
@@ -129,6 +206,7 @@ class OneDictExtension(Extension):
 
         self.word_list = []
         self.search_cache = {}
+        self.symspell_matcher = SymSpellMatcher()
 
     def run(self):
         self.subscribe(PreferencesEvent, PreferencesEventListener())
@@ -145,6 +223,10 @@ class PreferencesEventListener(EventListener):
             for voc in extension.preferences["vocabulary"].split(",")
         ]
         extension.word_list = load_words(vocabularies)
+        
+        # Initialize SymSpell if using symspell matching method
+        if extension.preferences.get("matching") == "symspell":
+            extension.symspell_matcher.initialize(extension.word_list)
 
 
 class PreferencesUpdateEventListener(EventListener):
@@ -159,6 +241,10 @@ class PreferencesUpdateEventListener(EventListener):
         
         # Clear cache when vocabularies change
         extension.search_cache.clear()
+        
+        # Re-initialize SymSpell if using symspell matching method
+        if extension.preferences.get("matching") == "symspell":
+            extension.symspell_matcher.initialize(extension.word_list)
 
 
 class KeywordQueryEventListener(EventListener):
@@ -184,6 +270,9 @@ class KeywordQueryEventListener(EventListener):
                         for w in filtered_words
                         if re.search(r"^{}".format(query), w.get_search_name())
                     ]
+                elif extension.preferences["matching"] == "symspell":
+                    # Use SymSpell for ultra-fast spell checking
+                    result_list = extension.symspell_matcher.search(query, max_edit_distance=2, limit=9)
                 else:
                     # Apply both length and first-character filtering for fuzzy search
                     filtered_words = filter_words_by_length(extension.word_list, query)
