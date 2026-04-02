@@ -1,34 +1,33 @@
 {
-    "required_api_version": "^2.0.0",
+    "api_version": "3",
     "name": "Spell",
-    "description": "Help you spell",
-    "developer_name": "Lohen Yumnam",
+    "authors": "Lohen Yumnam",
     "icon": "images/icon.png",
-    "options": {
-        "query_debounce": 0.05
+    "input_debounce": 0.05,
+    "triggers": {
+        "keyword": {
+            "name": "Spell",
+            "description": "Spelling assistance and word lookup",
+            "default_keyword": "spell"
+        }
     },
-    "preferences": [
-        {
-            "id": "keyword",
-            "type": "keyword",
-            "name": "1Dictionary",
-            "description": "",
-            "default_value": "spell"
-        },
-        {
-            "id": "matching",
-            "type": "text",
+    "preferences": {
+        "matching": {
+            "type": "select",
             "name": "Matching method",
             "description": "Matching method. 'symspell' is ultra-fast (3000x faster), 'fuzzy' is balanced, 'regex' is prefix-only",
             "default_value": "symspell",
-            "options": ["symspell", "fuzzy", "regex"]
+            "options": [
+                {"value": "symspell", "text": "SymSpell (ultra-fast)"},
+                {"value": "fuzzy", "text": "Fuzzy (balanced)"},
+                {"value": "regex", "text": "Regex (prefix-only)"}
+            ]
         },
-        {
-            "id": "vocabulary",
+        "vocabulary": {
             "type": "text",
             "name": "Active vocabulary",
-            "description": "Active vocabularies: comma-delimted text. Supported vocabularies: english_uk, english, deutsch, espanol, francais, italiano, nederlands, norsk",
+            "description": "Active vocabularies: comma-delimited text. Supported: english_uk, english, deutsch, espanol, francais, italiano, nederlands, norsk",
             "default_value": "english_uk, english"
         }
-    ]
+    }
 }

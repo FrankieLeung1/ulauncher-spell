@@ -11,17 +11,19 @@ This is a Ulauncher extension called "Spell" that provides spelling assistance a
 ### Core Components
 
 - **main.py**: Single-file architecture containing all extension logic
-  - `OneDictExtension`: Main extension class that inherits from Ulauncher's Extension
+  - `SpellExtension`: Main extension class that inherits from Ulauncher's Extension (API v3)
   - `Word`: Simple data class representing a word and its vocabulary
-  - `CustomSortedList`: Custom sorted list for fuzzy search results
-  - Event listeners for handling keyword queries, preferences, and item selection
+  - `SymSpellMatcher`: Ultra-fast spell checking using SymSpell algorithm
+  - Class methods `on_input` and `on_preferences_update` handle events directly (no separate listener classes)
 
 ### Key Classes and Functions
 
 - `load_words(vocabularies)`: Loads word lists from vocabulary files in ISO 8859-1 encoding
-- `KeywordQueryEventListener`: Handles user queries and returns matching words
-- `PreferencesEventListener`/`PreferencesUpdateEventListener`: Manage extension preferences
-- `ItemEnterEventListener`: Handles word selection actions
+- `SpellExtension.on_input(input_text, trigger_id)`: Handles user queries and returns matching words
+- `SpellExtension.on_preferences_update(pref_id, value, previous_value)`: Handles preference changes
+- `filter_words_by_length()` / `filter_words_by_first_char()`: Smart pre-filtering for search
+- `rapidfuzz_search()`: RapidFuzz-based fuzzy matching
+- `fuzzy_search_fallback()`: Fallback using Ulauncher's built-in fuzzy search
 
 ### Vocabulary System
 
@@ -71,9 +73,9 @@ print(f'Loaded {len(words)} words')
 ## Configuration
 
 Extension behavior is controlled through Ulauncher preferences:
-- **keyword**: Trigger word (default: "spell")
-- **matching**: Search method - "symspell", "fuzzy", or "regex" (default: "symspell")
-- **vocabulary**: Comma-delimited list of active vocabularies (default: "english_uk, english")
+- **keyword** (trigger): Trigger word (default: "spell")
+- **matching** (select preference): Search method - "symspell", "fuzzy", or "regex" (default: "symspell")
+- **vocabulary** (text preference): Comma-delimited list of active vocabularies (default: "english_uk, english")
 
 ### Matching Method Guide
 
@@ -84,20 +86,21 @@ Extension behavior is controlled through Ulauncher preferences:
 ## File Structure
 
 - `main.py`: Complete extension implementation
-- `manifest.json`: Ulauncher extension metadata and preferences schema
-- `versions.json`: API version compatibility
+- `manifest.json`: Ulauncher extension metadata with triggers and preferences (API v3 format)
+- `versions.json`: API version compatibility (v3 for current, v2 commit for backward compat)
 - `vocabularies/`: Language-specific word list files
 - `images/`: Extension icons and screenshots
 
 ## Key Implementation Details
 
-- Uses Ulauncher API version ^2.0.0
+- Uses Ulauncher API version 3 (Ulauncher v6)
 - Word selection copies to clipboard via `CopyToClipboardAction`
 - Query debounce set to 0.05 seconds for responsive typing
 - SymSpell provides sub-millisecond search with one-time dictionary setup cost
 - Smart filtering reduces search space by 97-99% for fuzzy/regex methods
 - Result caching provides instant responses for repeated queries
-- Extension name internally uses "OneDictExtension" (legacy from original "1Dictionary" name)
+- Uses `ExtensionResult` from `ulauncher.api` (replaces legacy `ExtensionResultItem`)
+- Returns result lists directly from `on_input` (no `RenderResultListAction` wrapper needed)
 
 ## Dependencies
 
@@ -110,5 +113,5 @@ Extension behavior is controlled through Ulauncher preferences:
 1. **SymSpell Integration**: 3000x faster than traditional fuzzy search
 2. **Smart Filtering**: Length and first-character filtering reduces search space by 97-99%
 3. **RapidFuzz**: 10-50x faster than original fuzzy matching
-4. **Result Caching**: Instant responses for repeated queries (200-item LRU cache)
+4. **Result Caching**: Instant responses for repeated queries (200-item dict cache)
 5. **Lazy Initialization**: SymSpell dictionary built only when needed
